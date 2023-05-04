@@ -6,14 +6,21 @@ from bs4 import BeautifulSoup as BSoup
 from datetime import datetime
 
 HEADER = {"X-Api-Key": "014709cfb534266769769522ac9ebaab"}
-URL = "https://api.erasmusgeneration.org/api/v1/activities"
+URL = "https://api.erasmusgeneration.org/api/static/v1/activities"
 
+def fetch_country_codes():
+    df_codes = pd.read_csv("country_codes.txt")[["name", "alpha-2"]]
+    dic_codes = {}
+    for _, row in df_codes.iterrows():
+        dic_codes[row["alpha-2"]] = row["name"]
+    return dic_codes
 
 def blank_content(response):
     if len(response["data"]) == 0:
         return True
     else:
         return False
+
 def get_activities():
     current_page = 0
     data = {}
@@ -42,38 +49,40 @@ def get_activities():
     with open("data_raw.json", "w") as output_file:
         json.dump(data, output_file)
 
-
-if __name__ == "__main__":
-    # get_activities()
-    with open("data_raw.json", "r", encoding="utf-8") as f:
-        raw_data = json.load(f)
-    for key in raw_data.keys():
-        print(f"{key}: {raw_data[key][0]}")
-
-    columns = ["id", "url", "title", "description","goal", "date_from", "date_to", "main_organiser", "participants",
-               "country_of_origin", "type", "causes"]
+def process_data(data):
+    columns = ["id", "url", "title", "description", "goal", "date_from", "date_to", "main_organiser", "participants",
+               "country_of_origin", "type", "physical_location", "causes", "objectives", "sdgs"]
     df_activities = pd.DataFrame(data=[], columns=columns)
 
     df_causes = pd.DataFrame(data=[], columns=["identifier", "cause"])
     df_objectives = pd.DataFrame(data=[], columns=["identifier", "objective"])
     df_sdgs = pd.DataFrame(data=[], columns=["identifier", "sdg"])
 
-    for index, identifier in enumerate(raw_data["id"]):
-        url = raw_data["url"][index]
-        title = raw_data["title"][index]
-        description = "\n".join(list(BSoup(raw_data["description"][index], "html.parser").stripped_strings))
-        goal = "\n".join(list(BSoup(raw_data["goal"][index], "html.parser").stripped_strings))
-        date_from = datetime.fromtimestamp(raw_data["dates"][0]["start"]).strftime("%d/%m/%Y")
-        date_to = datetime.fromtimestamp(raw_data["dates"][0]["end"]).strftime("%d/%m/%Y")
+    codes = fetch_country_codes()
+
+    for index, identifier in enumerate(data["id"]):
+        url = data["url"][index]
+        title = data["title"][index]
+        description = "\n".join(list(BSoup(data["description"][index], "html.parser").stripped_strings))
+        goal = "\n".join(list(BSoup(data["goal"][index], "html.parser").stripped_strings))
+        date_from = data["dates"][index]["start"]
+        date_to = data["dates"][index]["end"]
         participants = ""
-        main_organiser = raw_data["organisers"][index][0]
-        country_of_origin = raw_data["country"][index]
-        event_form = raw_data["type"][index]
-        causes = [cause["name"] for cause in raw_data["causes"][index]]
+        main_organiser = data["organisers"][index][0]
+        country_of_origin = codes[data["country"][index]]
+        event_form = data["type"][index]
+
+        if isinstance(data["physical_data"][index], dict):
+            if len(data["physical_data"][index]["city"]) > 3:
+                physical_location = f'{data["physical_data"][index]["city"]}, {codes[data["physical_data"][index]["country"]]}'
+        else:
+            physical_location = country_of_origin
+
+        causes = [cause["name"] for cause in data["causes"][index]]
         causes.sort()
-        objectives = [x for x in raw_data["objectives"][index]]
+        objectives = [x for x in data["objectives"][index]]
         objectives.sort()
-        sdgs = [sdg["name"] for sdg in raw_data["sdgs"][index]]
+        sdgs = [sdg["name"] for sdg in data["sdgs"][index]]
 
         df_causes_temp = pd.DataFrame(
             data={"identifier": [identifier] * len(causes), "cause": causes}
@@ -91,11 +100,27 @@ if __name__ == "__main__":
         df_sdgs = pd.concat([df_sdgs, df_sdgs_temp])
 
         df_activities_temp = pd.DataFrame(
-            data=[[identifier, url, title, description, goal, date_from, date_to, participants, main_organiser,
-                   country_of_origin, event_form, ", ".join(causes)]],
+            data=[[identifier, url, title, description, goal, date_from, date_to, main_organiser, participants,
+                   country_of_origin, event_form, physical_location, ", ".join(causes), ", ".join(objectives), ", ".join(sdgs)]],
             columns=columns)
         df_activities = pd.concat([df_activities, df_activities_temp])
 
-    print("\n")
-    print(df_objectives.objective.iloc[0])
+    df_activities.date_from = pd.to_datetime(df_activities.date_from, unit="s")
+    df_activities.date_to = pd.to_datetime(df_activities.date_to, unit="s")
 
+    df_activities.to_excel("activities.xlsx", encoding="utf-8", index=False)
+    df_causes.to_excel("activities_causes.xlsx", encoding="utf-8", index=False)
+
+    return df_activities, df_causes, df_objectives, df_sdgs
+
+
+if __name__ == "__main__":
+    # Download events and save the data into JSON
+    get_activities()
+    # Open the JSON and process the data
+    with open("data_raw.json", "r", encoding="utf-8") as f:
+        raw_data = json.load(f)
+    activities, causes, objectives, sdgs = process_data(raw_data)
+
+    for key in raw_data.keys():
+        print(f"{key}: {raw_data[key][0]}")

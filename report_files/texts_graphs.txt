@@ -1,0 +1,12 @@
+The most dedication goes to the {top_cause} cause with a total of {top_cause_count} events being dedicated to this
+cause. You can see the popularity of the remaining causes in the graph below.$
+{top_section} is on fire, organising whooping {top_section_count} events! Huge respect to you,
+friends!$
+Who's going to win, David, or Goliath? The first place in the country with the most organised events goes to...
+ {top_events_country}!$
+What are your favorite types of events? We know ours, it's {top_type} with a total of {top_type_count} dedicated events!$
+We all know how sustainable events are important! This time, we have dedicated our events mostly to {top_goal}.$
+It's not all about fun! By organising events for our students, we have a perfect chance to educate our students as
+ well. This month, the objective number one was {top_objective}.$
+Congratulations to {top_country_participants} for having a total of {top_country_participants_count:,} participants
+ joining their events! You can see the other contenders with the top 5 highest total participants in the graph below.

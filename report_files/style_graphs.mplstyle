@@ -1,0 +1,23 @@
+# Fonts
+font.sans-serif: Kelson Sans
+font.size: 25
+# Axes Specification
+axes.labelpad: 10
+axes.titlepad: 20
+axes.spines.bottom: False
+axes.spines.left: True
+axes.spines.right: False
+axes.spines.top: False
+axes.linewidth: 5
+axes.edgecolor: 0.33
+# Grid Specification
+grid.linewidth: 2.5
+grid.linestyle: -
+grid.color: "black"
+# Y-tick Specification
+ytick.left: False
+ytick.major.pad: 20
+ytick.labelsize: 25
+# X-tick Specification
+xtick.bottom: False
+xtick.labelsize: 0

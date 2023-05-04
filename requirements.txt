@@ -1,3 +1,7 @@
 requests
 pandas
 bs4
+openpyxl
+matplotlib
+geopandas
+python-docx
