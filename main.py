@@ -355,6 +355,20 @@ class ChartDatasets:
                       "participant_count": self.participants_agg.reset_index()
         }
 
+        self.text_values = {
+            "top_cause": self.top_data["top_causes"].index[-1],
+            "top_cause_count": self.top_data["top_causes"]['values'][-1],
+            "top_section": self.top_data["top_organisers"].index[-1],
+            "top_section_count": self.top_data["top_organisers"]['values'][-1],
+            "top_events_country": self.top_data["top_countries"].index[-1][0],
+            "top_type": self.top_data["top_categories"].index[-1],
+            "top_type_count": self.top_data["top_categories"]['values'][-1],
+            "top_goal": self.top_data["top_sdgs"].index[-1],
+            "top_objective": self.top_data["top_objectives"].index[-1],
+            "top_country_participants": self.top_data["top_participants"].index[-1][0],
+            "top_country_participants_count": self.top_data["top_participants"]['values'][-1]
+        }
+
         for name, dataset in self.top_data.items():
             dataset.to_csv(FILE_DIRECTORY.joinpath(f"{name}_{STAMP}.csv"))
 
@@ -380,7 +394,7 @@ class DocReport:
             self.section_titles = title_file.read().split('\n')
         # Texts for each section
         with open(GRAPH_TEXTS_PATH, "r") as text_file:
-            self.texts = text_file.read().replace("\n", "").split('$')
+            self.texts = text_file.read().format(** self.chart_datasets.text_values).replace("\n", "").split('$')
         # Outro text
         with open(OUTRO_TEXT_PATH, "r") as outro_texts:
             self.outro_texts = outro_texts.read().replace("\n","").split("$")
