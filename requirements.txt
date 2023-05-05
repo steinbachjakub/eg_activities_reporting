@@ -5,3 +5,4 @@ openpyxl
 matplotlib
 geopandas
 python-docx
+python-dateutil

@@ -1,4 +1,4 @@
 Dear network, this is the regular report of events submitted in ESN Activities. Below, you can find some highlights
-(for the period of {date_from} to {date_to}). $
+ (for the period of {date_from} to {date_to}). $
 Are you curious about how your National Organisation or your local sections fare? Would you like us to create a similar report for you? No problem! Just contact us at $
 social-impact@esn.org.

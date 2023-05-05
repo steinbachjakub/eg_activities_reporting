@@ -9,7 +9,8 @@ import requests
 import pandas as pd
 from pathlib import Path
 from matplotlib import pyplot as plt
-from datetime import datetime
+from datetime import datetime, date
+from dateutil.relativedelta import relativedelta
 from bs4 import BeautifulSoup as BSoup
 import geopandas as gpd
 from docx import Document
@@ -234,13 +235,13 @@ class ActivityRecord:
         self.id = record["id"]
         self.uuid = record["uuid"]
         self.type = record["type"]
-        self.created = datetime.fromtimestamp(record["created"]).strftime("%d/%m/%Y")
-        self.last_change = datetime.fromtimestamp(record["changed"]).strftime("%d/%m/%Y")
+        self.created = datetime.fromtimestamp(record["created"])
+        self.last_change = datetime.fromtimestamp(record["changed"])
         self.title = record["title"]
         self.no_iso = record["country"]
         self.no_name = "" # need to search the iso enum
-        self.start_date = datetime.fromtimestamp(record["dates"]["start"]).strftime("%d/%m/%Y")
-        self.end_date = datetime.fromtimestamp(record["dates"]["end"]).strftime("%d/%m/%Y")
+        self.start_date = datetime.fromtimestamp(record["dates"]["start"])
+        self.end_date = datetime.fromtimestamp(record["dates"]["end"])
         self.description = BSoup(record["description"], "html.parser").get_text()
         self.goal = BSoup(record["goal"], "html.parser").get_text()
         self.main_organiser = record["organisers"][0]
@@ -278,23 +279,33 @@ class ActivityRecord:
                      "location_country", "location_city"])
         # Other Organisers
         self.organisers_record = pd.DataFrame(
-            data={"id": [self.id] * len(record["organisers"]), "organiser": record["organisers"]}
+            data={"id": [self.id] * len(record["organisers"]),
+                  "start_date":  [self.start_date] * len(record["organisers"]),
+                  "organiser": record["organisers"]}
         )
         # Causes
         self.causes_record = pd.DataFrame(
-            data={"id": [self.id] * len(self.causes), "cause": self.causes},
+            data={"id": [self.id] * len(self.causes),
+                  "start_date":  [self.start_date] * len(self.causes),
+                  "cause": self.causes},
         )
         # SDGs
         self.sdgs_record = pd.DataFrame(
-            data={"id": [self.id] * len(self.sdgs), "sdg": self.sdgs},
+            data={"id": [self.id] * len(self.sdgs),
+                  "start_date":  [self.start_date] * len(self.sdgs),
+                  "sdg": self.sdgs},
         )
         # Objectives
         self.objectives_record = pd.DataFrame(
-            data={"id": [self.id] * len(self.objectives), "objective": self.objectives},
+            data={"id": [self.id] * len(self.objectives),
+                  "start_date":  [self.start_date] * len(self.objectives),
+                  "objective": self.objectives},
         )
         # Categories
         self.categories_record = pd.DataFrame(
-            data={"id": [self.id] * len(self.categories), "category": self.categories},
+            data={"id": [self.id] * len(self.categories),
+                  "start_date":  [self.start_date] * len(self.categories),
+                  "category": self.categories},
         )
 
 
@@ -302,16 +313,22 @@ class ChartDatasets:
     """
     Class representing chart and map generator
     """
-    def __init__(self, records, top=5):
-        self.activities = records["activities"]
+    def __init__(self, records, date_from, date_to, top=5):
+        self.activities = records["activities"][(records["activities"]["start_date"] >= date_from) &
+                                                (records["activities"]["start_date"] <= date_to)]
         self.activities["total_participants"] = self.activities[["local_participants", "intl_participants", "coordinators"]].sum(axis=1)
-        self.activity_type = records["categories"]
-        self.causes = records["causes"]
-        self.goals = records["sdgs"]
-        self.objectives = records["objectives"]
+        self.activity_type = records["categories"][(records["categories"]["start_date"] >= date_from) &
+                                                (records["categories"]["start_date"] <= date_to)]
+        self.causes = records["causes"][(records["causes"]["start_date"] >= date_from) &
+                                                (records["causes"]["start_date"] <= date_to)]
+        self.goals = records["sdgs"][(records["sdgs"]["start_date"] >= date_from) &
+                                                (records["sdgs"]["start_date"] <= date_to)]
+        self.objectives = records["objectives"][(records["objectives"]["start_date"] >= date_from) &
+                                                (records["objectives"]["start_date"] <= date_to)]
+        self.organisers = records["organisers"][(records["organisers"]["start_date"] >= date_from) &
+                                                (records["organisers"]["start_date"] <= date_to)]
         self.organisations = records["organisations"]
         self.organisations["base_color"] = "black"
-        self.organisers = records["organisers"]
 
         # Analysing loaded data
         self.causes_agg = self.causes.groupby("cause").agg({"cause": "count"}).rename(columns={"cause": "values"}) \
@@ -374,21 +391,32 @@ class ChartDatasets:
 
 
 class DocReport:
-    def __init__(self, records, document):
-        self.chart_datasets = ChartDatasets(records)
+    def __init__(self, records, document, date_from=None, date_to=None):
         self.document = document
         self.document_styles = self.document.styles
         self.title_style = None
         self.heading_style = None
         self.text_style = None
+        if date_from is None or date_to is None:
+            now = datetime.now()
+            if now.day > 15:
+                date_to = datetime(now.year, now.month, 1) - relativedelta(seconds=1)
+            else:
+                date_to = datetime(now.year, now.month, 1) - relativedelta(months=1, seconds=1)
+            date_from = date_to - relativedelta(months=1, seconds=-1)
+
+            print(f"Date not set, creating a report from the period {date_from.strftime('%d %b %Y')} "
+                  f"- {date_to.strftime('%d %b %Y')}.")
+        self.chart_datasets = ChartDatasets(records, date_from, date_to)
 
         # Title text
         with open(TITLE_TEXT_PATH, "r") as title_text:
             self.title = title_text.read()
-            print(self.title)
         # Intro text
         with open(INTRO_TEXT_PATH, "r") as intro_texts:
-            self.intro_texts = intro_texts.read().replace("\n", "").split("$")
+            self.intro_texts = intro_texts.read()\
+                .format(date_from=date_from.strftime("%d %b %Y"), date_to=date_to.strftime("%d %b %Y"))\
+                .replace("\n", "").split("$")
         # Titles for each section
         with open(GRAPH_TITLES_PATH, "r") as title_file:
             self.section_titles = title_file.read().split('\n')
@@ -418,7 +446,7 @@ class DocReport:
         self.text_style.paragraph_format.keep_with_next = True
         self.text_style.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
 
-    def generate_report(self, date_from, date_to):
+    def generate_report(self):
         if not REPORT_DIRECTORY.exists():
             REPORT_DIRECTORY.mkdir()
         # Add the title
@@ -446,7 +474,11 @@ class DocReport:
 
 def pipeline():
     print(f"Accessing {ACTIVITIES_URL} to fetch updated information.")
-    activities_data = requests.get(url=ACTIVITIES_URL, headers=ACTIVITIES_HEADER).json()["data"]
+    response = requests.get(url=ACTIVITIES_URL, headers=ACTIVITIES_HEADER)
+    try:
+        activities_data = response.json()["data"]
+    except Exception as e:
+        print(f"Exception {e} occured. The status code is {response.status_code}")
     print(f"Request complete. Proceeding with processing individual records...")
     counter = 1
     for _, record in activities_data.items():
@@ -507,6 +539,8 @@ def load_datasets():
     data = {}
     for name in names:
         data[name] = pd.read_csv(FILE_DIRECTORY.joinpath(f"{name}_{STAMP}.csv"))
+        if "start_date" in data[name].columns:
+            data[name]["start_date"] = pd.to_datetime(data[name]["start_date"])
 
     return data
 
@@ -523,7 +557,7 @@ OUTRO_TEXT_PATH = Path("report_files", "outro_texts.txt")
 REPORT_DIRECTORY = Path("reports")
 STAMP = "test"
 ACTIVITIES_HEADER = {"X-Api-Key": "014709cfb534266769769522ac9ebaab"}
-ACTIVITIES_URL = "https://api.erasmusgeneration.org/api/static/v1/activities"
+ACTIVITIES_URL = "https://api.erasmusgeneration.org/api/v1/static/activities"
 SECTIONS_URL = "https://accounts.esn.org/api/v1/sections"
 COUNTRIES_URL = "https://accounts.esn.org/api/v1/countries"
 # ESN COLORS
@@ -546,4 +580,4 @@ if __name__ == '__main__':
     document = Document()
     report = DocReport(data, document)
     report.set_styles()
-    report.generate_report("Monday", "Friday")
+    report.generate_report()
