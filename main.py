@@ -399,7 +399,7 @@ class DocReport:
         self.text_style = None
         if date_from is None or date_to is None:
             now = datetime.now()
-            if now.day > 15:
+            if now.day >= 15:
                 date_to = datetime(now.year, now.month, 1) - relativedelta(seconds=1)
             else:
                 date_to = datetime(now.year, now.month, 1) - relativedelta(months=1, seconds=1)
