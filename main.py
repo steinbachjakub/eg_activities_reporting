@@ -367,6 +367,8 @@ class ChartDatasets:
                         "top_sdgs": self.goals_agg.sort_values("values")[-top:],
                         "top_objectives": self.objectives_agg.sort_values("values")[-top:],
                         "top_participants": self.participants_agg[self.participants_agg["values"] >= self.participants_agg["values"][-top]]}
+        self.top_data["top_countries"] = self.top_data["top_countries"].droplevel("country")
+        self.top_data["top_participants"] = self.top_data["top_participants"].droplevel("country")
 
         self.map_data = {"event_count": self.countries_agg.reset_index(),
                       "participant_count": self.participants_agg.reset_index()
@@ -377,18 +379,48 @@ class ChartDatasets:
             "top_cause_count": self.top_data["top_causes"]['values'][-1],
             "top_section": self.top_data["top_organisers"].index[-1],
             "top_section_count": self.top_data["top_organisers"]['values'][-1],
-            "top_events_country": self.top_data["top_countries"].index[-1][0],
+            "top_events_country": self.top_data["top_countries"].index[-1],
             "top_type": self.top_data["top_categories"].index[-1],
             "top_type_count": self.top_data["top_categories"]['values'][-1],
             "top_goal": self.top_data["top_sdgs"].index[-1],
             "top_objective": self.top_data["top_objectives"].index[-1],
-            "top_country_participants": self.top_data["top_participants"].index[-1][0],
+            "top_country_participants": self.top_data["top_participants"].index[-1],
             "top_country_participants_count": self.top_data["top_participants"]['values'][-1]
         }
 
         for name, dataset in self.top_data.items():
             dataset.to_csv(FILE_DIRECTORY.joinpath(f"{name}_{STAMP}.csv"))
 
+class Chart:
+    def __init__(self, data):
+        plt.style.use(GRAPH_STYLE_PATH)
+        self.fig = plt.figure(figsize=(16, 9))
+        ax = self.fig.add_subplot(111)
+        labels = []
+        for x in data.index:
+            if len(x) > 30:
+                labels.append(x[:x[:30].rfind(" ")] + "\n" + x[x[:30].rfind(" ") + 1:])
+            else:
+                labels.append(x)
+        values = data["values"]
+        bars = ax.barh(labels, values, color=COLORS["darkblue"])
+        for index, bar in enumerate(bars):
+            ax.text(
+                data["values"][index] - 0.1 * data["values"].min(),
+                bar.get_y() + bar.get_height() / 2,
+                int(bar.get_width()),
+                ha="right",
+                va="center",
+                color=COLORS["white"],
+            )
+        ax.set_axisbelow(True)
+        ax.grid(which="major", axis="x", alpha=0.5)
+        plt.tight_layout()
+
+    def save_img(self):
+        save_path = FILE_DIRECTORY.joinpath("tempfig.png")
+        self.fig.savefig(save_path)
+        return str(save_path)
 
 class DocReport:
     def __init__(self, records, document, date_from=None, date_to=None):
@@ -425,7 +457,7 @@ class DocReport:
             self.texts = text_file.read().format(** self.chart_datasets.text_values).replace("\n", "").split('$')
         # Outro text
         with open(OUTRO_TEXT_PATH, "r") as outro_texts:
-            self.outro_texts = outro_texts.read().replace("\n","").split("$")
+            self.outro_texts = outro_texts.read().replace("\n", "").split("$")
 
     def set_styles(self):
         self.title_style = self.document_styles.add_style("TitleStyle", WD_STYLE_TYPE.PARAGRAPH)
@@ -460,11 +492,14 @@ class DocReport:
         runner.bold = True
         runner.italic = True
         # Add sections
-        for title, text in zip(self.section_titles, self.texts):
+        for title, text, data in zip(self.section_titles, self.texts, self.chart_datasets.top_data.values()):
             # Create the category heading
             self.document.add_paragraph(title, style=self.heading_style)
             # Add the text to each category
             self.document.add_paragraph(text, style=self.text_style)
+            # Add the chart to each category
+            temp_fig = Chart(data)
+            self.document.add_picture(temp_fig.save_img(), height=Cm(8))
         # Add the outro text
         for text in self.outro_texts:
             self.document.add_paragraph(text, style=self.text_style)
