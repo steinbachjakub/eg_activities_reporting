@@ -329,6 +329,7 @@ class ChartDatasets:
                                                 (records["organisers"]["start_date"] <= date_to)]
         self.organisations = records["organisations"]
         self.organisations["base_color"] = "black"
+        self.organisations_no = self.organisations[self.organisations.level == "national"][["country", "base_color"]]
 
         # Analysing loaded data
         self.causes_agg = self.causes.groupby("cause").agg({"cause": "count"}).rename(columns={"cause": "values"}) \
@@ -369,9 +370,8 @@ class ChartDatasets:
                         "top_participants": self.participants_agg[self.participants_agg["values"] >= self.participants_agg["values"][-top]]}
         self.top_data["top_countries"] = self.top_data["top_countries"].droplevel("country")
         self.top_data["top_participants"] = self.top_data["top_participants"].droplevel("country")
-
-        self.map_data = {"event_count": self.countries_agg.reset_index(),
-                      "participant_count": self.participants_agg.reset_index()
+        self.map_data = {"event_count": self.countries_agg.reset_index().drop(columns=["national_organisation"]),
+                      "participant_count": self.participants_agg.reset_index().drop(columns=["national_organisation"])
         }
 
         self.text_values = {
@@ -390,6 +390,7 @@ class ChartDatasets:
 
         for name, dataset in self.top_data.items():
             dataset.to_csv(FILE_DIRECTORY.joinpath(f"{name}_{STAMP}.csv"))
+
 
 class Chart:
     def __init__(self, data):
@@ -422,6 +423,97 @@ class Chart:
         self.fig.savefig(save_path)
         return str(save_path)
 
+
+class Map:
+    def __init__(self, countries_color, date_from, date_to, data, legend_title):
+        plt.style.use(GRAPH_STYLE_PATH)
+        # Merging the existing data from Activities, setting up the quartil colors
+        countries_color_events = countries_color.merge(data, how="left", on="country")
+        # Filling the countries not found in Activities with black or grey based on the existence of NOs
+        countries_color_events["color"] = countries_color_events["color"].cat.add_categories(["black", "grey"])\
+            .fillna(countries_color_events["base_color"])
+        # Creating a figure
+        self.fig = plt.figure(figsize=(16, 9))
+        ax = self.fig.add_subplot(111)
+        # Plotting countries for each unique color
+        for c in countries_color_events["color"].unique():
+            countries_color_events[countries_color_events["color"] == c].plot(ax=ax, color=COLORS[c], linewidth=0.1,
+                                                                              ec="#CCCCCC")
+        # Limits, clearing ticks
+        ax.set_aspect(1.)
+        ax.set_xlim(-15, 65)
+        ax.set_ylim(30, 75)
+        ax.set_xticks([])
+        ax.set_yticks([])
+        # Delete spines
+        for d in ["left", "top", "right", "bottom"]:
+            ax.spines[d].set_visible(False)
+        # Custom Legend
+            # Calculating quartile borders
+        borders = data["values"].quantile([0, 0.25, 0.5, 0.75, 1], interpolation="nearest").values
+        borders[0] = 0
+            # Creating labels
+        legend_labels = ["no submission"]
+        for i in range(len(borders) - 1):
+            legend_labels.append(f"{int(borders[i] + 1):,} - {int(borders[i + 1]):,}")
+        # Legend
+        custom_lines = [Line2D([0], [0], color=COLORS["darkblue"], lw=4),
+                        Line2D([0], [0], color=COLORS["cyan"], lw=4),
+                        Line2D([0], [0], color=COLORS["orange"], lw=4),
+                        Line2D([0], [0], color=COLORS["magenta"], lw=4),
+                        Line2D([0], [0], color=COLORS["black"], lw=4)
+                        ]
+        title = f"{legend_title}\n{date_from.strftime('%d %b %Y')} - {date_to.strftime('%d %b %Y')}"
+        ax.legend(custom_lines, legend_labels[-1::-1], title=title, loc="upper right")
+        plt.tight_layout()
+
+    def save_img(self):
+        save_path = FILE_DIRECTORY.joinpath("tempfig.png")
+        self.fig.savefig(save_path)
+        return str(save_path)
+
+    # colors = gdf_countries.merge(dataset[["country", "values", "color"]], how="left",
+    #                                            left_on="ADMIN", right_on="country")
+    #     colors["color"] = colors["color"].cat.add_categories(["black", "grey"]).fillna(colors["base_color"])
+    #
+    #     fig, ax = plt.subplots(1, 1, figsize=(16, 9))
+    #     for c in colors["color"].unique():
+    #         colors[colors["color"] == c].plot(ax=ax, color=COLORS[c], linewidth=0.1, ec="#CCCCCC")
+    #
+    #     # Limits, clearing ticks
+    #     ax.set_aspect(1.)
+    #     ax.set_xlim(-15, 65)
+    #     ax.set_ylim(30, 75)
+    #     ax.set_xticks([])
+    #     ax.set_yticks([])
+    #
+    #     # Delete spines
+    #     for d in ["left", "top", "right", "bottom"]:
+    #         ax.spines[d].set_visible(False)
+    #
+    #     # CUSTOM LEGEND
+    #     # Calculating quartile borders
+    #     borders = dataset["values"].quantile([0, 0.25, 0.5, 0.75, 1], interpolation="nearest").values
+    #     borders[0] = 0
+    #     # Creating labels
+    #     legend_labels = ["no submission"]
+    #     for i in range(len(borders) - 1):
+    #         legend_labels.append(f"{int(borders[i] + 1):,} - {int(borders[i + 1]):,}")
+    #     # Legend
+    #     custom_lines = [Line2D([0], [0], color=COLORS["darkblue"], lw=4),
+    #                     Line2D([0], [0], color=COLORS["cyan"], lw=4),
+    #                     Line2D([0], [0], color=COLORS["orange"], lw=4),
+    #                     Line2D([0], [0], color=COLORS["magenta"], lw=4),
+    #                     Line2D([0], [0], color=COLORS["black"], lw=4)
+    #                     ]
+    #
+    #     ax.legend(custom_lines, legend_labels[-1::-1], title=f"{legend_title}\n{date_from} - {date_to}",
+    #               loc="upper right")
+    #
+    #     plt.tight_layout()
+    #     plt.savefig(name)
+
+
 class DocReport:
     def __init__(self, records, document, date_from=None, date_to=None):
         self.document = document
@@ -429,17 +521,19 @@ class DocReport:
         self.title_style = None
         self.heading_style = None
         self.text_style = None
-        if date_from is None or date_to is None:
+        self.date_from = date_from
+        self.date_to = date_to
+        if self.date_from is None or self.date_to is None:
             now = datetime.now()
             if now.day >= 15:
-                date_to = datetime(now.year, now.month, 1) - relativedelta(seconds=1)
+                self.date_to = datetime(now.year, now.month, 1) - relativedelta(seconds=1)
             else:
-                date_to = datetime(now.year, now.month, 1) - relativedelta(months=1, seconds=1)
-            date_from = date_to - relativedelta(months=1, seconds=-1)
+                self.date_to = datetime(now.year, now.month, 1) - relativedelta(months=1, seconds=1)
+            self.date_from = self.date_to - relativedelta(months=1, seconds=-1)
 
-            print(f"Date not set, creating a report from the period {date_from.strftime('%d %b %Y')} "
-                  f"- {date_to.strftime('%d %b %Y')}.")
-        self.chart_datasets = ChartDatasets(records, date_from, date_to)
+            print(f"Date not set, creating a report from the period {self.date_from.strftime('%d %b %Y')} "
+                  f"- {self.date_to.strftime('%d %b %Y')}.")
+        self.chart_datasets = ChartDatasets(records, self.date_from, self.date_to)
 
         # Title text
         with open(TITLE_TEXT_PATH, "r") as title_text:
@@ -447,8 +541,18 @@ class DocReport:
         # Intro text
         with open(INTRO_TEXT_PATH, "r") as intro_texts:
             self.intro_texts = intro_texts.read()\
-                .format(date_from=date_from.strftime("%d %b %Y"), date_to=date_to.strftime("%d %b %Y"))\
+                .format(date_from=self.date_from.strftime("%d %b %Y"), date_to=self.date_to.strftime("%d %b %Y"))\
                 .replace("\n", "").split("$")
+        # Map text
+        with open(MAP_TEXTS_PATH, "r") as map_texts:
+            self.map_texts = map_texts.read()\
+                .format(total_events=self.chart_datasets.activities.shape[0],
+                        total_pax=self.chart_datasets.activities["total_participants"].sum(),
+                        avg_pax=self.chart_datasets.activities["total_participants"].sum() / self.chart_datasets.activities.shape[0])\
+                .replace("\n", "").split("$")
+        # Titles for map charts
+        with open(MAP_TITLES_PATH, "r") as map_file:
+            self.map_titles = map_file.read().split("\n")
         # Titles for each section
         with open(GRAPH_TITLES_PATH, "r") as title_file:
             self.section_titles = title_file.read().split('\n')
@@ -491,6 +595,21 @@ class DocReport:
         runner = paragraph.add_run(self.intro_texts[2])
         runner.bold = True
         runner.italic = True
+        # Add general information with maps
+            # Add text
+        self.document.add_paragraph(self.map_texts[0], style=self.heading_style)
+        self.document.add_paragraph(self.map_texts[1], style=self.text_style)
+            # Loading geo data for all countries
+        gdf_countries = gpd.read_file(COUNTRIES_MAP_PATH).rename(columns={"ADMIN": "country"})\
+            .drop(columns=["ISO_A3"])
+            # Setting up information on which countries interest us (only countries with NOs)
+        countries_color = gdf_countries.merge( self.chart_datasets.organisations_no, how="left", on="country")
+            # Filling the rest of countries as grey
+        countries_color["base_color"] = countries_color["base_color"].fillna("grey")
+        for data, title in zip(self.chart_datasets.map_data.values(), self.map_titles):
+            # countries_color, date_from, date_to, data, legend_title
+            temp_fig = Map(countries_color, self.date_from, self.date_to, data, title)
+            self.document.add_picture(temp_fig.save_img(), height=Cm(8))
         # Add sections
         for title, text, data in zip(self.section_titles, self.texts, self.chart_datasets.top_data.values()):
             # Create the category heading
@@ -583,6 +702,8 @@ def load_datasets():
 FILE_DIRECTORY = Path("files")
 FILE_DIRECTORY.mkdir(exist_ok=True, parents=True)
 COUNTRIES_MAP_PATH = Path("report_files", "countries.geojson")
+MAP_TITLES_PATH = Path("report_files", "titles_maps.txt")
+MAP_TEXTS_PATH = Path("report_files", "texts_maps.txt")
 GRAPH_TITLES_PATH = Path("report_files", "titles_graphs.txt")
 GRAPH_TEXTS_PATH = Path("report_files", "texts_graphs.txt")
 GRAPH_STYLE_PATH = Path("report_files", "style_graphs.mplstyle")
@@ -609,10 +730,12 @@ COLORS = {
 
 
 if __name__ == '__main__':
+    date_from = datetime(2023, 2, 1)
+    date_to = datetime(2023, 2, 28)
     # pipeline()
     get_organisations_info()
     data = load_datasets()
     document = Document()
-    report = DocReport(data, document)
+    report = DocReport(data, document, date_from, date_to)
     report.set_styles()
     report.generate_report()
