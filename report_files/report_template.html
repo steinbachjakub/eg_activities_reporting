@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>A test page</title>
+    <style>
+        body {margin: 1cm auto; max-width: 16cm; padding: 0 0.5cm 1cm 0.5cm; text-align: justify;}
+        p {font-family: "Lato"; font-size: 11pt; margin-bottom: 10pt; margin-top: 0; line-height: 1.33}
+        h1 {font-family: "Kelson Sans"; font-size: 24pt}
+        h2 {font-family: "Lato"; font-size: 16pt; margin-top: 10pt; margin-bottom: 10pt; color: #2E3192;}
+        img {width: 90%; display: block; margin-left: auto; margin-right: auto;}
+      </style>
+</head>
+<body>
+    <h1>Monthly Activities Report</h1>
+    <p>Dear network, this is the regular report of events submitted in ESN Activities. 
+        Below, you can find some highlights from the past month (for the period of 
+        <b>{{ date_from }}</b> to <b>{{ date_to }}</b>).</p>
+
+    <p><b>Are you curious about how your National Organisation or your local sections fare? 
+        Would you like us to create a similar report for you? No problem! 
+        Just contact us at </b><i>social-impact@esn.org</i><b>.</b></p>
+
+
+    <h2>Few Numbers First</h2>
+    <p>In the past month, a total of <b>{{ total_events }}</b> events were organised. A total of 
+        <b>{{ total_participants}}</b> participants joined our events which results in the average 
+        of <b>{{ average_participants }}</b> participants per one event.</p>
+
+    <p>You can see the comparison of event and participant numbers in the maps below.</p>
+
+    <p><img src="{{ map_0_name }}" alt="map"></p>
+
+    <p><img src="{{ map_1_name }}" alt="map"></p>
+
+    <h2>Number of Events Dedicated to Each Cause</h2>
+    <p>The most dedication goes to the <b>{{ top_cause }}</b> cause with a total of <b>{{ top_cause_count }}</b> events 
+        being dedicated to this cause. You can see the popularity of the remaining causes 
+        in the graph below.</p>
+
+    <p><img src="{{ chart_0_name }}" alt="chart"></p>
+
+
+    <h2>Organisers with Top 5 Highest Organised Events</h2>
+    <p><b>{{ top_organiser }}</b> is on fire with whooping <b>{{ top_organiser_count }}</b> events organised 
+        in the past month! Huge respect to you, friends!</p>
+
+    <p><img src="{{ chart_1_name }}" alt="chart"></p>
+
+
+    <h2>ESN Countries with Top 5 Highest Organised Events</h2>
+    <p>Who's going to win, David, or Goliath? The first place in the country with the most 
+        organised events goes to... <b>{{ top_country }}</b>!</p>
+
+    <p><img src="{{ chart_2_name }}" alt="chart"></p>
+
+
+    <h2>Top 5 Represented Types of Events</h2>
+    <p>What are your favorite types of events? We know ours, it's <b>{{ top_type }}</b> with 
+        a total of <b>{{ top_type_count }}</b> dedicated events!</p>
+
+    <p><img src="{{ chart_3_name }}" alt="chart"></p>
+
+
+    <h2>Top 5 Reached Sustainable Development Goals</h2>
+    <p>We all know how sustainable events are important! This month, we have dedicated our events 
+        mostly to <b>{{ top_goal }}</b>.</p>
+
+    <p><img src="{{ chart_4_name }}" alt="chart"></p>
+
+
+    <h2>Top 5 Reached Objectives</h2>
+    <p>It's not all about fun! By organising events for our students, we have a perfect chance 
+        to educate our students aswell. This month, the objective number one was 
+        <b>{{ top_objective }}</b>.</p>
+
+    <p><img src="{{ chart_5_name }}" alt="chart"></p>
+
+
+    <h2>Countries with Top 5 Highest Number of Participants</h2>
+    <p>Congratulations to <b>{{ top_country_participants }}</b> for reaching 
+        a total of <b>{{ top_country_participants_count }}</b> participants joining their 
+        events! You can see the other contenders with the top 5 highest total participants 
+         in the graph below.</p>
+
+    <p><img src="{{ chart_6_name }}" alt="chart"></p>
+
+
+    <p>That's all from us for now. See you next month!</p>
+
+    <p>Yours faithfully,<br>Social Impact Team</p>
+</body>
+</html>

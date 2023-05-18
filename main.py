@@ -329,7 +329,7 @@ class ChartDatasets:
                                                 (records["organisers"]["start_date"] <= date_to)]
         self.organisations = records["organisations"]
         self.organisations["base_color"] = "black"
-        self.organisations_no = self.organisations[self.organisations.level == "national"][["country", "base_color"]]
+        self.organisations_no = self.organisations[self.organisations.level == "national"][["country", "national_organisation", "base_color"]]
 
         # Analysing loaded data
         self.causes_agg = self.causes.groupby("cause").agg({"cause": "count"}).rename(columns={"cause": "values"}) \
@@ -370,9 +370,8 @@ class ChartDatasets:
                         "top_participants": self.participants_agg[self.participants_agg["values"] >= self.participants_agg["values"][-top]]}
         self.top_data["top_countries"] = self.top_data["top_countries"].droplevel("country")
         self.top_data["top_participants"] = self.top_data["top_participants"].droplevel("country")
-        self.map_data = {"event_count": self.countries_agg.reset_index().drop(columns=["national_organisation"]),
-                      "participant_count": self.participants_agg.reset_index().drop(columns=["national_organisation"])
-        }
+        self.map_data = {"event_count": self.countries_agg.reset_index(),
+                      "participant_count": self.participants_agg.reset_index()}
 
         self.text_values = {
             "top_cause": self.top_data["top_causes"].index[-1],
@@ -428,21 +427,21 @@ class Map:
     def __init__(self, countries_color, date_from, date_to, data, legend_title):
         plt.style.use(GRAPH_STYLE_PATH)
         # Merging the existing data from Activities, setting up the quartil colors
-        countries_color_events = countries_color.merge(data, how="left", on="country")
+        countries_color_events = countries_color.merge(data, how="left", on="national_organisation")
         # Filling the countries not found in Activities with black or grey based on the existence of NOs
         countries_color_events["color"] = countries_color_events["color"].cat.add_categories(["black", "grey"])\
             .fillna(countries_color_events["base_color"])
         # Creating a figure
-        self.fig = plt.figure(figsize=(16, 9))
+        self.fig = plt.figure(figsize=(16, 10))
         ax = self.fig.add_subplot(111)
         # Plotting countries for each unique color
         for c in countries_color_events["color"].unique():
-            countries_color_events[countries_color_events["color"] == c].plot(ax=ax, color=COLORS[c], linewidth=0.1,
+            countries_color_events[countries_color_events["color"] == c][["geometry"]].plot(ax=ax, color=COLORS[c], linewidth=0.1,
                                                                               ec="#CCCCCC")
         # Limits, clearing ticks
         ax.set_aspect(1.)
-        ax.set_xlim(-15, 65)
-        ax.set_ylim(30, 75)
+        x_min, x_max = ax.get_xlim()
+        ax.set_xlim(x_min - 0.2 * (x_max - x_min), x_max)
         ax.set_xticks([])
         ax.set_yticks([])
         # Delete spines
@@ -464,11 +463,13 @@ class Map:
                         Line2D([0], [0], color=COLORS["black"], lw=4)
                         ]
         title = f"{legend_title}\n{date_from.strftime('%d %b %Y')} - {date_to.strftime('%d %b %Y')}"
-        ax.legend(custom_lines, legend_labels[-1::-1], title=title, loc="upper right")
+        ax.legend(custom_lines, legend_labels[-1::-1], title=title, loc="upper left")
         plt.tight_layout()
 
     def save_img(self):
         save_path = FILE_DIRECTORY.joinpath("tempfig.png")
+        self.fig.savefig(save_path)
+        save_path = FILE_DIRECTORY.joinpath("asdfghjkkl.png")
         self.fig.savefig(save_path)
         return str(save_path)
 
@@ -600,12 +601,7 @@ class DocReport:
         self.document.add_paragraph(self.map_texts[0], style=self.heading_style)
         self.document.add_paragraph(self.map_texts[1], style=self.text_style)
             # Loading geo data for all countries
-        gdf_countries = gpd.read_file(COUNTRIES_MAP_PATH).rename(columns={"ADMIN": "country"})\
-            .drop(columns=["ISO_A3"])
-            # Setting up information on which countries interest us (only countries with NOs)
-        countries_color = gdf_countries.merge( self.chart_datasets.organisations_no, how="left", on="country")
-            # Filling the rest of countries as grey
-        countries_color["base_color"] = countries_color["base_color"].fillna("grey")
+        countries_color = load_map_polygons(self.chart_datasets.organisations_no)
         for data, title in zip(self.chart_datasets.map_data.values(), self.map_titles):
             # countries_color, date_from, date_to, data, legend_title
             temp_fig = Map(countries_color, self.date_from, self.date_to, data, title)
@@ -697,6 +693,19 @@ def load_datasets():
             data[name]["start_date"] = pd.to_datetime(data[name]["start_date"])
 
     return data
+
+def load_map_polygons(organisations_no):
+    # gdf_countries = gpd.read_file(COUNTRIES_MAP_PATH).rename(columns={"ADMIN": "country"}) \
+    #     .drop(columns=["ISO_A3"])
+    gdf_countries = gpd.read_file("report_files/map.geojson").rename(columns={"CAPT": "national_organisation"}).drop(
+        columns=["OBJECTID", "CNTR_ID", "ISO3_CODE", "NAME_ENGL", "total_PAX", "total_EVENTS", "Shape_Length",
+                 "Shape_Area"])
+    # gdf = gdf[gdf.national_organisation != "NO"]
+    # Setting up information on which countries interest us (only countries with NOs)
+    countries_color = gdf_countries.merge(organisations_no, how="left", on="national_organisation")
+    # Filling the rest of countries as grey
+    countries_color["base_color"] = countries_color["base_color"].fillna("grey")
+    return countries_color
 
 
 FILE_DIRECTORY = Path("files")

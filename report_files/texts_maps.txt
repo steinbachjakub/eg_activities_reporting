@@ -1,0 +1,4 @@
+Few Numbers First$
+In the past month, total of {total_events:,} events were organised. The total of {total_pax:,} participants joined our events
+ which results in the average of {avg_pax:.2f} participants per one event.$
+You can see the comparison of event and participant numbers in the maps below.
